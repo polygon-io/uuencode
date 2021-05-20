@@ -97,7 +97,7 @@ func (d Decoder) Decode(reader io.Reader, output io.Writer) error {
 			return fmt.Errorf("error decoding line %d: %w", lineNumber, err)
 		}
 
-		// Write the decoded characters to the output writer
+		// Write the decoded bytes to the output writer
 		if _, err := output.Write(decoded[:decodedLen]); err != nil {
 			return fmt.Errorf("error writing decoded bytes to writer: %w", err)
 		}
