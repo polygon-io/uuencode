@@ -23,6 +23,9 @@ const (
 type Decoder struct {
 	// encoding is used to decode individual lines within the encoded text.
 	encoding *base64.Encoding
+
+	// paddingChar is used to pad lines that have had their padding chopped off for one reason or another.
+	paddingChar string
 }
 
 // NewStandardDecoder returns a Decoder that uses the StandardCharset.
@@ -34,7 +37,10 @@ func NewStandardDecoder() Decoder {
 // See StandardCharset and AlternateCharset for common values.
 // Note: the provided charset must be a valid base64 charset, otherwise attempts to Decode may panic.
 func NewDecoder(charset string) Decoder {
-	return Decoder{encoding: base64.NewEncoding(charset).WithPadding(base64.NoPadding)}
+	return Decoder{
+		encoding: base64.NewEncoding(charset).WithPadding(base64.NoPadding),
+		paddingChar: string(charset[0]), // Padding char is just the first character in the charset
+	}
 }
 
 // DecodeToBytes is a convenience function for decoding a reader when you just want all the decoded contents in memory in a byte slice.
@@ -64,8 +70,8 @@ func (d Decoder) Decode(reader io.Reader, output io.Writer) error {
 
 		line := scanner.Text()
 
-		// We don't care about the begin line
-		if strings.HasPrefix(line, "begin") {
+		// We don't care about the begin line, we also don't care about empty lines
+		if strings.HasPrefix(line, "begin") || len(line) == 0 {
 			continue
 		}
 
@@ -90,9 +96,12 @@ func (d Decoder) Decode(reader io.Reader, output io.Writer) error {
 			continue
 		}
 
-		// The formatted characters are everything after the length char
-		formattedCharacters := line[1:]
-		decoded, err := d.encoding.DecodeString(formattedCharacters)
+		// The formatted characters are everything after the length char.
+		// Sometimes padding is omitted from the line, so we have to make sure we add it back before decoding.
+		expectedLen := d.encoding.EncodedLen(int(decodedLen))
+		encodedCharacters := d.padContentLine(line[1:], expectedLen)
+
+		decoded, err := d.encoding.DecodeString(encodedCharacters)
 		if err != nil {
 			return fmt.Errorf("error decoding line %d: %w", lineNumber, err)
 		}
@@ -105,4 +114,12 @@ func (d Decoder) Decode(reader io.Reader, output io.Writer) error {
 
 	// If we made it out of the loop, it means we never saw the 'end' line
 	return fmt.Errorf("malformed input; missing 'end' line")
+}
+
+func (d Decoder) padContentLine(line string, expectedLen int) string {
+	for len(line) < expectedLen {
+		line += d.paddingChar
+	}
+
+	return line
 }
