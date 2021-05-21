@@ -38,7 +38,7 @@ func NewStandardDecoder() Decoder {
 // Note: the provided charset must be a valid base64 charset, otherwise attempts to Decode may panic.
 func NewDecoder(charset string) Decoder {
 	return Decoder{
-		encoding: base64.NewEncoding(charset).WithPadding(base64.NoPadding),
+		encoding:    base64.NewEncoding(charset).WithPadding(base64.NoPadding),
 		paddingChar: string(charset[0]), // Padding char is just the first character in the charset
 	}
 }
@@ -71,7 +71,7 @@ func (d Decoder) Decode(reader io.Reader, output io.Writer) error {
 		line := scanner.Text()
 
 		// We don't care about the begin line, we also don't care about empty lines
-		if strings.HasPrefix(line, "begin") || len(line) == 0 {
+		if strings.HasPrefix(line, "begin") || line == "" {
 			continue
 		}
 
@@ -80,9 +80,8 @@ func (d Decoder) Decode(reader io.Reader, output io.Writer) error {
 			return nil
 		}
 
-		// Not a special line, let's get to decoding...
-
-		// First check the line length character. If it's the special character backtick (`), the line is empty and we should skip it
+		// If it's not a begin or end line, first check the line length character.
+		// If it's the special character backtick (`), the line is empty and we should skip it
 		lengthChar := line[0]
 		if lengthChar == '`' {
 			continue
